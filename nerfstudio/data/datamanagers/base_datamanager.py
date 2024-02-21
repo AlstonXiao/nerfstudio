@@ -262,7 +262,7 @@ class DataManager(nn.Module):
         raise NotImplementedError
 
     @abstractmethod
-    def next_eval_image(self, step: int) -> Tuple[Cameras, Dict]:
+    def next_eval_image(self, step: int) -> Tuple[Cameras, Dict, Any]:
         """Retrieve the next eval image.
 
         Args:
@@ -549,10 +549,10 @@ class VanillaDataManager(DataManager, Generic[TDataset]):
         ray_bundle = self.eval_ray_generator(ray_indices)
         return ray_bundle, batch
 
-    def next_eval_image(self, step: int) -> Tuple[Cameras, Dict]:
-        for camera, batch in self.eval_dataloader:
+    def next_eval_image(self, step: int) -> Tuple[Cameras, Dict, Any]:
+        for camera, batch, camera_dict in self.eval_dataloader:
             assert camera.shape[0] == 1
-            return camera, batch
+            return camera, batch, camera_dict
         raise ValueError("No more eval images")
 
     def get_train_rays_per_batch(self) -> int:

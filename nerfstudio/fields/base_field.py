@@ -53,7 +53,6 @@ class Field(nn.Module):
         Args:
             positions: the origin of the samples/frustums
         """
-        del times
         # Need to figure out a better way to describe positions with a ray.
         ray_samples = RaySamples(
             frustums=Frustums(
@@ -62,7 +61,8 @@ class Field(nn.Module):
                 starts=torch.zeros_like(positions[..., :1]),
                 ends=torch.zeros_like(positions[..., :1]),
                 pixel_area=torch.ones_like(positions[..., :1]),
-            )
+            ),
+            times=times
         )
         density, _ = self.get_density(ray_samples)
         return density

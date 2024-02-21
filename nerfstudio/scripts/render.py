@@ -76,6 +76,7 @@ def _render_trajectory_video(
     colormap_options: colormaps.ColormapOptions = colormaps.ColormapOptions(),
     render_nearest_camera=False,
     check_occlusions: bool = False,
+    batch = None
 ) -> None:
     """Helper function to create a video of the spiral trajectory.
 
@@ -184,6 +185,12 @@ def _render_trajectory_video(
                     if max_idx == -1:
                         max_idx = true_max_idx
 
+                #     bounding_box_min = crop_data.center - crop_data.scale / 2.0
+                #     bounding_box_max = crop_data.center + crop_data.scale / 2.0
+                #     aabb_box = SceneBox(torch.stack([bounding_box_min, bounding_box_max]).to(pipeline.device))
+                # camera_ray_bundle = cameras.generate_rays(camera_indices=camera_idx, aabb_box=aabb_box)
+                # current_batch = batch[camera_idx]
+                # camera_dict = cameras.get_camera_stats(camera_idx)
                 if crop_data is not None:
                     with renderers.background_color_override_context(
                         crop_data.background_color.to(pipeline.device)
@@ -196,6 +203,10 @@ def _render_trajectory_video(
                         outputs = pipeline.model.get_outputs_for_camera(
                             cameras[camera_idx : camera_idx + 1], obb_box=obb_box
                         )
+                #         outputs = pipeline.model.get_outputs_for_camera_ray_bundle(camera_ray_bundle, current_batch, camera_dict)
+                # else:
+                #     with torch.no_grad():
+                #         outputs = pipeline.model.get_outputs_for_camera_ray_bundle(camera_ray_bundle, current_batch, camera_dict)
 
                 render_image = []
                 for rendered_output_name in rendered_output_names:

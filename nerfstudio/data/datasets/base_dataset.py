@@ -18,6 +18,7 @@ Dataset.
 from __future__ import annotations
 
 from copy import deepcopy
+import os
 from pathlib import Path
 from typing import Dict, List, Literal
 
@@ -33,6 +34,7 @@ from nerfstudio.cameras.cameras import Cameras
 from nerfstudio.data.dataparsers.base_dataparser import DataparserOutputs
 from nerfstudio.data.utils.data_utils import get_image_mask_tensor_from_path
 
+import cv2
 
 class InputDataset(Dataset):
     """Dataset that returns images.
@@ -54,6 +56,17 @@ class InputDataset(Dataset):
         self.cameras = deepcopy(dataparser_outputs.cameras)
         self.cameras.rescale_output_resolution(scaling_factor=scale_factor)
         self.mask_color = dataparser_outputs.metadata.get("mask_color", None)
+
+        if "roughness_filenames" in self.metadata:
+            self.roughness_filenames = self.metadata["roughness_filenames"]
+            self.albedo_filenames = self.metadata["albedo_filenames"]
+            self.normal_filenames = self.metadata["normal_filenames"]
+            self.mask_filenames = self.metadata["mask_filenames"]
+        else:
+            self.roughness_filenames = None
+            self.albedo_filenames = None
+            self.normal_filenames = None
+            self.mask_filenames = None
 
     def __len__(self):
         return len(self._dataparser_outputs.image_filenames)
@@ -139,13 +152,40 @@ class InputDataset(Dataset):
         return data
 
     def get_metadata(self, data: Dict) -> Dict:
-        """Method that can be used to process any additional metadata that may be part of the model inputs.
+        if self.mask_filenames is not None:
+            roughness_image = self.loadCV2Image(self.roughness_filenames[data["image_idx"]])
+            if roughness_image.shape[2] == 3:
+                roughness_image = roughness_image[:, :, 0]
+                roughness_image = roughness_image[:, :, None]
+            albedo_image = self.loadCV2Image(self.albedo_filenames[data["image_idx"]])
+            normal_image = self.loadCV2Image_normal(self.normal_filenames[data["image_idx"]])
+            mask_image = self.loadCV2Image(self.mask_filenames[data["image_idx"]])
+            if mask_image.shape[2] == 3:
+                mask_image = mask_image[:, :, 0]
+                mask_image = mask_image[:, :, None]
 
-        Args:
-            image_idx: The image index in the dataset.
-        """
-        del data
-        return {}
+
+            return {"roughness_image": roughness_image, "albedo_image": albedo_image,"normal_image": normal_image,"mask_image": mask_image,}
+        else: 
+            mask_image = torch.all(data["image"] == 0., dim=-1, keepdim=True)
+            return {"inferred_mask_image": mask_image}
+
+    def loadCV2Image(self, image_filename):
+        cv2_image = cv2.imread(str(image_filename),flags=cv2.IMREAD_ANYDEPTH)
+        cv2_image = cv2.cvtColor(cv2_image, cv2.COLOR_BGR2RGB)
+
+        return torch.FloatTensor(cv2_image)
+  
+    def loadCV2Image_normal(self, image_filename):
+        if not os.path.exists(image_filename):
+            image_filename = str(image_filename)[:-4] + ".hdr"
+        cv2_image = cv2.imread(str(image_filename), flags=cv2.IMREAD_ANYDEPTH)
+        cv2_image = cv2.cvtColor(cv2_image, cv2.COLOR_BGR2RGB)
+
+        cv2_image = cv2_image.astype(np.float32)
+        cv2_image = cv2_image * 2 - 1
+        cv2_image / np.linalg.norm(cv2_image, axis=-1, keepdims=True)
+        return torch.FloatTensor(cv2_image)
 
     def __getitem__(self, image_idx: int) -> Dict:
         data = self.get_data(image_idx)

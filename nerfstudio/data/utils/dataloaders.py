@@ -227,12 +227,13 @@ class FixedIndicesEvalDataloader(EvalDataloader):
         self.count = 0
         return self
 
-    def __next__(self):
+    def __next__(self) -> Tuple[Cameras, Dict, Dict]:
         if self.count < len(self.image_indices):
             image_idx = self.image_indices[self.count]
             camera, batch = self.get_camera(image_idx)
             self.count += 1
-            return camera, batch
+            camera_dict = self.cameras.get_camera_stats(image_idx)
+            return camera, batch, camera_dict
         raise StopIteration
 
 
@@ -250,4 +251,5 @@ class RandIndicesEvalDataloader(EvalDataloader):
         # choose a random image index
         image_idx = random.randint(0, len(self.cameras) - 1)
         camera, batch = self.get_camera(image_idx)
-        return camera, batch
+        camera_dict = self.cameras.get_camera_stats(image_idx)
+        return camera, batch, camera_dict

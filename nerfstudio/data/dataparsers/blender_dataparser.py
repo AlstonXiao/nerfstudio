@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Type
+from typing import Optional, Type, Tuple
 
 import imageio
 import numpy as np
@@ -47,7 +47,8 @@ class BlenderDataParserConfig(DataParserConfig):
     ply_path: Optional[Path] = None
     """Path to PLY file to load 3D points from, defined relative to the dataset directory. This is helpful for
     Gaussian splatting and generally unused otherwise. If `None`, points are initialized randomly."""
-
+    """alpha color of background"""
+    aabb: Tuple[Tuple[float, float, float], Tuple[float, float, float]] = ((-1.5, -1.5, -1.5), (1.5, 1.5, 1.5))
 
 @dataclass
 class Blender(DataParser):
@@ -62,6 +63,7 @@ class Blender(DataParser):
         self.data: Path = config.data
         self.scale_factor: float = config.scale_factor
         self.alpha_color = config.alpha_color
+        self.aabb = config.aabb
         if self.alpha_color is not None:
             self.alpha_color_tensor = get_color(self.alpha_color)
         else:
@@ -88,7 +90,8 @@ class Blender(DataParser):
 
         # in x,y,z order
         camera_to_world[..., 3] *= self.scale_factor
-        scene_box = SceneBox(aabb=torch.tensor([[-1.5, -1.5, -1.5], [1.5, 1.5, 1.5]], dtype=torch.float32))
+        scene_box = SceneBox(aabb=self.aabb)
+        # scene_box = SceneBox(aabb=torch.tensor([[-1, -1, -0.025], [1, 1, 0.5]], dtype=torch.float32))
 
         cameras = Cameras(
             camera_to_worlds=camera_to_world,

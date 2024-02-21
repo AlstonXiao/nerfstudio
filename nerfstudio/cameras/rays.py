@@ -125,7 +125,7 @@ class RaySamples(TensorDataclass):
     times: Optional[Float[Tensor, "*batch 1"]] = None
     """Times at which rays are sampled"""
 
-    def get_weights(self, densities: Float[Tensor, "*batch num_samples 1"]) -> Float[Tensor, "*batch num_samples 1"]:
+    def get_weights(self, densities: Float[Tensor, "*batch num_samples 1"], multiplyer = 1) -> Float[Tensor, "*batch num_samples 1"]:
         """Return weights based on predicted densities
 
         Args:
@@ -135,7 +135,7 @@ class RaySamples(TensorDataclass):
             Weights for each sample
         """
 
-        delta_density = self.deltas * densities
+        delta_density = self.deltas * densities * multiplyer
         alphas = 1 - torch.exp(-delta_density)
 
         transmittance = torch.cumsum(delta_density[..., :-1, :], dim=-2)
@@ -187,6 +187,29 @@ class RaySamples(TensorDataclass):
             return weights
         return weights, transmittance
 
+    def get_weights_and_transmittance(self, densities: Float[Tensor, "*batch num_samples 1"], multiplyer = 1) -> Float[Tensor, "*batch num_samples 1"]:
+        """Return weights based on predicted densities
+
+        Args:
+            densities: Predicted densities for samples along ray
+
+        Returns:
+            Weights for each sample
+        """
+
+        delta_density = self.deltas * densities * multiplyer
+        alphas = 1 - torch.exp(-delta_density)
+
+        transmittance = torch.cumsum(delta_density[..., :-1, :], dim=-2)
+        transmittance = torch.cat(
+            [torch.zeros((*transmittance.shape[:1], 1, 1), device=densities.device), transmittance], dim=-2
+        )
+        transmittance = torch.exp(-transmittance)  # [..., "num_samples"]
+
+        weights = alphas * transmittance  # [..., "num_samples"]
+        weights = torch.nan_to_num(weights)
+
+        return weights, transmittance
 
 @dataclass
 class RayBundle(TensorDataclass):

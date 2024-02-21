@@ -500,7 +500,15 @@ class Cameras(TensorDataclass):
         # so there might be a rogue squeeze happening somewhere, and this may cause some unintended behaviour
         # that we haven't caught yet with tests
         return raybundle
-
+    
+    def get_camera_stats(self, idx):
+        return {
+            "c2w": self.camera_to_worlds[idx].reshape(-1),
+            "cx": self.cx[idx],
+            "cy": self.cy[idx],
+            "fx": self.fx[idx],
+            "fy": self.fy[idx],
+        }
     def _generate_rays_from_coords(
         self,
         camera_indices: Int[Tensor, "*num_rays num_cameras_batch_dims"],
@@ -917,6 +925,14 @@ class Cameras(TensorDataclass):
             metadata["directions_norm"] = directions_norm[0].detach()
         else:
             metadata = {"directions_norm": directions_norm[0].detach()}
+            
+        # print(f"shape is {c2w.shape} {cx.shape} {fx.shape} ")
+        if len(c2w.shape) == 3:
+            metadata["c2w"] = c2w.view(c2w.shape[0], 12)
+            metadata["cx"] = cx[:, None]
+            metadata["cy"] = cy[:, None]
+            metadata["fx"] = fx[:, None]
+            metadata["fy"] = fy[:, None]
 
         return RayBundle(
             origins=origins,

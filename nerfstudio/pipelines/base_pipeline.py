@@ -298,7 +298,7 @@ class VanillaPipeline(Pipeline):
             step: current iteration step to update sampler if using DDP (distributed)
         """
         ray_bundle, batch = self.datamanager.next_train(step)
-        model_outputs = self._model(ray_bundle)  # train distributed data parallel model if world_size > 1
+        model_outputs = self._model(ray_bundle, batch)  # train distributed data parallel model if world_size > 1
         metrics_dict = self.model.get_metrics_dict(model_outputs, batch)
         loss_dict = self.model.get_loss_dict(model_outputs, batch, metrics_dict)
 
@@ -321,7 +321,7 @@ class VanillaPipeline(Pipeline):
         """
         self.eval()
         ray_bundle, batch = self.datamanager.next_eval(step)
-        model_outputs = self.model(ray_bundle)
+        model_outputs = self.model(ray_bundle, batch)
         metrics_dict = self.model.get_metrics_dict(model_outputs, batch)
         loss_dict = self.model.get_loss_dict(model_outputs, batch, metrics_dict)
         self.train()
@@ -336,8 +336,9 @@ class VanillaPipeline(Pipeline):
             step: current iteration step
         """
         self.eval()
-        camera, batch = self.datamanager.next_eval_image(step)
-        outputs = self.model.get_outputs_for_camera(camera)
+        
+        camera, batch, camera_dict = self.datamanager.next_eval_image(step)
+        outputs = self.model.get_outputs_for_camera(camera, batch, camera_dict)
         metrics_dict, images_dict = self.model.get_image_metrics_and_images(outputs, batch)
         assert "num_rays" not in metrics_dict
         metrics_dict["num_rays"] = (camera.height * camera.width * camera.size).item()
@@ -373,10 +374,11 @@ class VanillaPipeline(Pipeline):
         ) as progress:
             task = progress.add_task("[green]Evaluating all eval images...", total=num_images)
             idx = 0
-            for camera, batch in self.datamanager.fixed_indices_eval_dataloader:
+            for camera, batch, camera_dict in self.datamanager.fixed_indices_eval_dataloader:
                 # time this the following line
                 inner_start = time()
-                outputs = self.model.get_outputs_for_camera(camera=camera)
+                # outputs = self.model.get_outputs_for_camera(camera=camera)
+                outputs = self.model.get_outputs_for_camera_ray_bundle(camera, batch, camera_dict)
                 height, width = camera.height, camera.width
                 num_rays = height * width
                 metrics_dict, image_dict = self.model.get_image_metrics_and_images(outputs, batch)
